@@ -1,0 +1,44 @@
+name: Dev
+on:
+  push:
+    branches-ignore:
+      - main
+jobs:
+  qa-hello:
+    name: HubSpot-Sync to Development
+    environment: development
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: us.gcr.io/${{ secrets.GCP_PROJECT }}/hubspot-sync
+      DOCKERFILE: Dockerfile
+    defaults:
+      run:
+        working-directory: hubspot-sync
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # Setup gcloud CLI
+    - name: Login and set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        project_id: ${{ secrets.GCP_PROJECT }}
+        service_account_email: ${{ secrets.GCP_EMAIL }}
+        service_account_key: ${{ secrets.GCP_CREDENTIALS }}
+        export_default_credentials: true
+    
+    # Get the beta stuff in gcloud
+    # REQUIRED for Cloud Run to have a runtime > 600s
+    - name: Install beta components
+      run: gcloud components install beta
+
+    # Configure Docker with Credentials
+    - name: Configure Docker
+      run: gcloud auth configure-docker --quiet
+      
+    # Build the Docker image
+    - name: Build Docker image
+      run: docker build . -f $DOCKERFILE -t $IMAGE_NAME
+
+    - name: Push Docker image
+      run: docker push $IMAGE_NAME
